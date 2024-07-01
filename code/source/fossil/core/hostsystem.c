@@ -77,6 +77,10 @@ static fossil_bool_t fossil_hostsys_get_windows(fossil_hostsystem_t *info) {
 }
 
 #elif defined(__linux__)
+#include <sys/utsname.h>
+#include <sys/sysinfo.h>
+#include <unistd.h>
+
 static fossil_bool_t fossil_hostsys_get_linux(fossil_hostsystem_t *info) {
     struct utsname unameData;
     FILE *cpuinfo;
@@ -93,41 +97,40 @@ static fossil_bool_t fossil_hostsys_get_linux(fossil_hostsystem_t *info) {
     strncpy(info->os_version, unameData.release, sizeof(info->os_version));
 
     cpuinfo = fopen("/proc/cpuinfo", "r");
-    if (cpuinfo) {
-        while (fgets(line, sizeof(line), cpuinfo)) {
-            if (strstr(line, "model name")) {
-                char *pos = strchr(line, ':');
-                if (pos) {
-                    strncpy(info->cpu_model, pos + 2, sizeof(info->cpu_model));
-                    break;
-                }
-            }
-        }
-        fclose(cpuinfo);
-    } else {
+    if (!cpuinfo) {
         fprintf(stderr, "Error opening /proc/cpuinfo\n");
         return FOSSIL_FALSE;
     }
 
+    while (fgets(line, sizeof(line), cpuinfo)) {
+        if (strstr(line, "model name")) {
+            char *pos = strchr(line, ':');
+            if (pos) {
+                strncpy(info->cpu_model, pos + 2, sizeof(info->cpu_model));
+                break;
+            }
+        }
+    }
+    fclose(cpuinfo);
+
     info->cpu_cores = sysconf(_SC_NPROCESSORS_ONLN);
 
-    long pages = sysconf(_SC_PHYS_PAGES);
-    long page_size = sysconf(_SC_PAGE_SIZE);
-    info->total_memory = pages * page_size / (1024 * 1024);  // in MB
-
     struct sysinfo memInfo;
-    if (sysinfo(&memInfo) == 0) {
-        info->free_memory = memInfo.freeram / (1024 * 1024);  // in MB
-    } else {
+    if (sysinfo(&memInfo) != 0) {
         fprintf(stderr, "Error getting memory information\n");
         return FOSSIL_FALSE;
     }
+    info->total_memory = memInfo.totalram / (1024 * 1024);  // in MB
+    info->free_memory = memInfo.freeram / (1024 * 1024);    // in MB
 
     return FOSSIL_TRUE;
 }
 
 #elif defined(__APPLE__)
+#include <sys/types.h>
+#include <sys/sysctl.h>
 #include <mach/mach.h>
+#include <sys/utsname.h>
 
 static fossil_bool_t fossil_hostsys_get_macos(fossil_hostsystem_t *info) {
     struct utsname unameData;
