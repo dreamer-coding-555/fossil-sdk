@@ -218,8 +218,8 @@ FOSSIL_TEST(test_fossil_hostsys_get) {
     ASSUME_NOT_EQUAL_CSTR("", info.os_name);
     ASSUME_NOT_EQUAL_CSTR("", info.os_version);
     ASSUME_NOT_EQUAL_CSTR("", info.cpu_model);
-    ASSUME_ITS_MORE_OR_EQUAL_I32(0, info.free_memory);
-    ASSUME_ITS_MORE_OR_EQUAL_I32(0, info.total_memory);
+    ASSUME_NOT_MORE_THAN_I64(info.free_memory, 0);
+    ASSUME_NOT_MORE_THAN_I64(info.total_memory, 0);
 }
 
 FOSSIL_TEST(test_fossil_hostsys_endian) {
