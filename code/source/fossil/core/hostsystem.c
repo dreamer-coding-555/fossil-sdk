@@ -29,15 +29,8 @@ Description:
 #endif
 
 static fossil_bool_t fossil_hostsys_get_endian(fossil_hostsystem_t *info) {
-    unsigned int num = 1;
-    char *endian_check = (char*)&num;
-
-    if (*endian_check == 1) {
-        info->is_big_endian = FOSSIL_FALSE;
-    } else {
-        info->is_big_endian = FOSSIL_TRUE;
-    }
-
+    uint32_t num = 1;
+    info->is_big_endian = (*(uint8_t*)&num == 0);
     return FOSSIL_TRUE;
 }
 
@@ -47,7 +40,7 @@ static fossil_bool_t fossil_hostsys_get_windows(fossil_hostsystem_t *info) {
     SYSTEM_INFO si;
     MEMORYSTATUSEX memInfo;
 
-    memset(info, 0, sizeof(fossil_hostsystem_t));
+    ZeroMemory(info, sizeof(fossil_hostsystem_t));
     ZeroMemory(&osvi, sizeof(OSVERSIONINFO));
     osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
     
@@ -56,7 +49,7 @@ static fossil_bool_t fossil_hostsys_get_windows(fossil_hostsystem_t *info) {
         return FOSSIL_FALSE;
     }
 
-    strncpy(info->os_name, "Windows", sizeof(info->os_name));
+    strncpy(info->os_name, "Windows", sizeof(info->os_name) - 1);
     snprintf(info->os_version, sizeof(info->os_version), "%ld.%ld",
              osvi.dwMajorVersion, osvi.dwMinorVersion);
 
@@ -65,6 +58,7 @@ static fossil_bool_t fossil_hostsys_get_windows(fossil_hostsystem_t *info) {
 
     info->cpu_cores = si.dwNumberOfProcessors;
 
+    memInfo.dwLength = sizeof(MEMORYSTATUSEX);
     if (!GlobalMemoryStatusEx(&memInfo)) {
         fprintf(stderr, "Error getting memory information\n");
         return FOSSIL_FALSE;
@@ -75,12 +69,9 @@ static fossil_bool_t fossil_hostsys_get_windows(fossil_hostsystem_t *info) {
 
     return FOSSIL_TRUE;
 }
+#endif
 
-#elif defined(__linux__)
-#include <sys/utsname.h>
-#include <sys/sysinfo.h>
-#include <unistd.h>
-
+#ifdef __linux__
 static fossil_bool_t fossil_hostsys_get_linux(fossil_hostsystem_t *info) {
     struct utsname unameData;
     FILE *cpuinfo;
@@ -93,8 +84,8 @@ static fossil_bool_t fossil_hostsys_get_linux(fossil_hostsystem_t *info) {
         return FOSSIL_FALSE;
     }
 
-    strncpy(info->os_name, unameData.sysname, sizeof(info->os_name));
-    strncpy(info->os_version, unameData.release, sizeof(info->os_version));
+    strncpy(info->os_name, unameData.sysname, sizeof(info->os_name) - 1);
+    strncpy(info->os_version, unameData.release, sizeof(info->os_version) - 1);
 
     cpuinfo = fopen("/proc/cpuinfo", "r");
     if (!cpuinfo) {
@@ -106,7 +97,7 @@ static fossil_bool_t fossil_hostsys_get_linux(fossil_hostsystem_t *info) {
         if (strstr(line, "model name")) {
             char *pos = strchr(line, ':');
             if (pos) {
-                strncpy(info->cpu_model, pos + 2, sizeof(info->cpu_model));
+                strncpy(info->cpu_model, pos + 2, sizeof(info->cpu_model) - 1);
                 break;
             }
         }
@@ -125,13 +116,9 @@ static fossil_bool_t fossil_hostsys_get_linux(fossil_hostsystem_t *info) {
 
     return FOSSIL_TRUE;
 }
+#endif
 
-#elif defined(__APPLE__)
-#include <sys/types.h>
-#include <sys/sysctl.h>
-#include <mach/mach.h>
-#include <sys/utsname.h>
-
+#ifdef __APPLE__
 static fossil_bool_t fossil_hostsys_get_macos(fossil_hostsystem_t *info) {
     struct utsname unameData;
     memset(info, 0, sizeof(fossil_hostsystem_t));
@@ -141,8 +128,8 @@ static fossil_bool_t fossil_hostsys_get_macos(fossil_hostsystem_t *info) {
         return FOSSIL_FALSE;
     }
 
-    strncpy(info->os_name, unameData.sysname, sizeof(info->os_name));
-    strncpy(info->os_version, unameData.release, sizeof(info->os_version));
+    strncpy(info->os_name, unameData.sysname, sizeof(info->os_name) - 1);
+    strncpy(info->os_version, unameData.release, sizeof(info->os_version) - 1);
 
     // Get CPU model
     int mib[2] = {CTL_HW, HW_MODEL};
